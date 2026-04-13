@@ -1,1 +1,575 @@
-.
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tradutor PRO+</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  margin: 0;
+  color: #fff;
+}
+.container {
+  max-width: 500px;
+  margin: auto;
+  padding: 20px;
+}
+h1 { text-align: center; }
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.ativa {
+  background: #00ffcc;
+  color: #000;
+}
+
+.card {
+  background: rgba(255,255,255,0.1);
+  padding: 15px;
+  border-radius: 15px;
+}
+
+select, textarea, button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+textarea {
+  height: 100px;
+}
+
+.pulsando {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  50% { transform: scale(1.1); }
+}
+
+.btn-ativo {
+  background: #00ffcc !important;
+  color: #000;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🌍 Tradutor PRO+</h1>
+
+<div class="tabs">
+  <button class="tab-btn ativa" onclick="trocarAba('tradutor', this)">🌍 Tradução</button>
+  <button class="tab-btn" onclick="trocarAba('conversa', this)">🎙️ Conversa</button>
+</div>
+
+<!-- TRADUTOR -->
+<div id="tradutor" class="card">
+
+<select id="fromLang"></select>
+<select id="toLang"></select>
+
+<button onclick="inverter()">🔁 Inverter</button>
+
+<textarea id="inputText" placeholder="Digite/Fotografe ou fale..." onclick="limparEntrada()"></textarea>
+
+
+<div class="row">
+  <button onclick="traduzir()">🌐 Traduzir</button>
+  <button id="btnFalar" onclick="falar()">🎤</button>
+</div>
+
+
+<textarea id="outputText" readonly></textarea>
+
+<button id="btnOuvir" onclick="ouvir()">🔊 Ouvir</button>
+
+<button onclick="abrirCamera()">📷 Fotografar documento p/traduzir</button>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+</div>
+
+<!-- CONVERSA -->
+<div id="conversa" class="card" style="display:none;">
+
+<select id="langA"></select>
+<select id="langB"></select>
+
+<div class="row">
+  <button id="btnA" onclick="falarPessoa('A')">🎤 Pessoa A</button>
+  <button id="btnB" onclick="falarPessoa('B')">🎤 Pessoa B</button>
+</div>
+
+<textarea id="log" placeholder="Conversa..."></textarea>
+
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<script>
+
+
+
+
+// ===== ABAS =====
+function trocarAba(id, el){
+  tradutor.style.display="none";
+  conversa.style.display="none";
+  document.getElementById(id).style.display="block";
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("ativa"));
+  el.classList.add("ativa");
+}
+
+// ===== LIMPAR CAMPOS =====
+function limparEntrada(){
+  inputText.value = "";
+  outputText.value = "";
+}
+
+// ===== INVERTER IDIOMAS =====
+function inverter(){
+  const temp = fromLang.value;
+  fromLang.value = toLang.value;
+  toLang.value = temp;
+
+  // opcional: inverter textos também
+  const tempTxt = inputText.value;
+  inputText.value = outputText.value;
+  outputText.value = tempTxt;
+}
+
+
+// ===== FAVORITOS =====
+const favoritos = ["pt","en","es","fr","de"];
+
+// ===== IDIOMAS =====
+const idiomas = [
+["af","🇿🇦 Africâner"],
+["ak","🇬🇭 Akan"],
+["sq","🇦🇱 Albanês"],
+["de","🇩🇪 Alemão"],
+["am","🇪🇹 Amárico"],
+["ar","🇸🇦 Árabe"],
+["hy","🇦🇲 Armênio"],
+["as","🇮🇳 Assamês"],
+["ay","🇧🇴 Aimará"],
+["az","🇦🇿 Azerbaijano"],
+["bm","🇲🇱 Bambara"],
+["eu","🇪🇸 Basco"],
+["be","🇧🇾 Bielorrusso"],
+["bn","🇧🇩 Bengali"],
+["bho","🇮🇳 Bhojpuri"],
+["bs","🇧🇦 Bósnio"],
+["bg","🇧🇬 Búlgaro"],
+["my","🇲🇲 Birmanês"],
+["ca","🇪🇸 Catalão"],
+["ceb","🇵🇭 Cebuano"],
+["ny","🇲🇼 Chichewa"],
+["zh","🇨🇳 Chinês"],
+["si","🇱🇰 Cingalês"],
+["ko","🇰🇷 Coreano"],
+["co","🇫🇷 Corso"],
+["hr","🇭🇷 Croata"],
+["da","🇩🇰 Dinamarquês"],
+["dv","🇲🇻 Divehi"],
+["doi","🇮🇳 Dogri"],
+["sk","🇸🇰 Eslovaco"],
+["sl","🇸🇮 Esloveno"],
+["es","🇪🇸 Espanhol"],
+["eo","🌍 Esperanto"],
+["et","🇪🇪 Estoniano"],
+["ee","🇬🇭 Ewe"],
+["tl","🇵🇭 Filipino"],
+["fi","🇫🇮 Finlandês"],
+["fr","🇫🇷 Francês"],
+["fy","🇳🇱 Frísio"],
+["gd","🏴 Gaélico Escocês"],
+["gl","🇪🇸 Galego"],
+["ka","🇬🇪 Georgiano"],
+["el","🇬🇷 Grego"],
+["gn","🇵🇾 Guarani"],
+["gu","🇮🇳 Gujarati"],
+["ht","🇭🇹 Haitiano"],
+["ha","🇳🇬 Hauçá"],
+["haw","🇺🇸 Havaiano"],
+["he","🇮🇱 Hebraico"],
+["hi","🇮🇳 Hindi"],
+["hmn","🇱🇦 Hmong"],
+["nl","🇳🇱 Holandês"],
+["hu","🇭🇺 Húngaro"],
+["ig","🇳🇬 Igbo"],
+["yi","🇮🇱 Iídiche"],
+["ilo","🇵🇭 Ilocano"],
+["id","🇮🇩 Indonésio"],
+["en","🇺🇸 Inglês"],
+["ga","🇮🇪 Irlandês"],
+["is","🇮🇸 Islandês"],
+["it","🇮🇹 Italiano"],
+["ja","🇯🇵 Japonês"],
+["jw","🇮🇩 Javanês"],
+["kn","🇮🇳 Canarês"],
+["kk","🇰🇿 Cazaque"],
+["km","🇰🇭 Khmer"],
+["rw","🇷🇼 Kinyarwanda"],
+["gom","🇮🇳 Concani"],
+["ku","🌍 Curdo"],
+["ckb","🌍 Curdo Sorani"],
+["ky","🇰🇬 Quirguiz"],
+["lo","🇱🇦 Laosiano"],
+["la","🏛️ Latim"],
+["lv","🇱🇻 Letão"],
+["ln","🇨🇩 Lingala"],
+["lt","🇱🇹 Lituano"],
+["lb","🇱🇺 Luxemburguês"],
+["mk","🇲🇰 Macedônio"],
+["mai","🇮🇳 Maithili"],
+["mg","🇲🇬 Malgaxe"],
+["ms","🇲🇾 Malaio"],
+["ml","🇮🇳 Malaiala"],
+["mt","🇲🇹 Maltês"],
+["mi","🇳🇿 Maori"],
+["mr","🇮🇳 Marata"],
+["mni","🇮🇳 Manipuri"],
+["lus","🇮🇳 Mizo"],
+["mn","🇲🇳 Mongol"],
+["ne","🇳🇵 Nepalês"],
+["no","🇳🇴 Norueguês"],
+["or","🇮🇳 Oriya"],
+["om","🇪🇹 Oromo"],
+["ps","🇦🇫 Pashto"],
+["fa","🇮🇷 Persa"],
+["pl","🇵🇱 Polonês"],
+["pt","🇧🇷 Português"],
+["pa","🇮🇳 Punjabi"],
+["qu","🇵🇪 Quíchua"],
+["ro","🇷🇴 Romeno"],
+["ru","🇷🇺 Russo"],
+["sm","🇼🇸 Samoano"],
+["sa","🇮🇳 Sânscrito"],
+["sr","🇷🇸 Sérvio"],
+["st","🇱🇸 Sesoto"],
+["nso","🇿🇦 Sepedi"],
+["tn","🇧🇼 Setswana"],
+["sn","🇿🇼 Shona"],
+["sd","🇵🇰 Sindi"],
+["so","🇸🇴 Somali"],
+["sw","🇰🇪 Suaíli"],
+["sv","🇸🇪 Sueco"],
+["su","🇮🇩 Sundanês"],
+["tg","🇹🇯 Tajique"],
+["ta","🇮🇳 Tâmil"],
+["tt","🇷🇺 Tártaro"],
+["te","🇮🇳 Telugu"],
+["th","🇹🇭 Tailandês"],
+["ti","🇪🇷 Tigrínia"],
+["ts","🇿🇦 Tsonga"],
+["tr","🇹🇷 Turco"],
+["tk","🇹🇲 Turcomeno"],
+["ak","🇬🇭 Twi"],
+["uk","🇺🇦 Ucraniano"],
+["ur","🇵🇰 Urdu"],
+["ug","🇨🇳 Uigur"],
+["uz","🇺🇿 Uzbeque"],
+["vi","🇻🇳 Vietnamita"],
+["cy","🏴 Galês"],
+["xh","🇿🇦 Xhosa"],
+["yo","🇳🇬 Iorubá"],
+["zu","🇿🇦 Zulu"],
+["ba","🇷🇺 Bashkir"],
+["bi","🇻🇺 Bislama"],
+["ch","🌍 Chamorro"],
+["cr","🇨🇦 Cree"],
+["dz","🇧🇹 Dzongkha"],
+["ff","🌍 Fula"],
+["gv","🇮🇲 Manx"],
+["ho","🌍 Hiri Motu"],
+["hz","🇳🇦 Herero"],
+["ik","🌍 Inupiaq"],
+["iu","🇨🇦 Inuktitut"],
+["jv","🇮🇩 Javanês"],
+["kl","🇬🇱 Groenlandês"],
+["kv","🇷🇺 Komi"],
+["kj","🇳🇦 Kuanyama"],
+["li","🇳🇱 Limburgan"],
+["lu","🇨🇩 Luba-Katanga"],
+["lg","🇺🇬 Ganda"],
+["mh","🇲🇭 Marshallês"],
+["nv","🇺🇸 Navajo"],
+["nr","🇿🇦 Ndebele"],
+["ng","🇳🇦 Ndonga"],
+["oc","🇫🇷 Occitano"],
+["oj","🇨🇦 Ojibwe"],
+["pi","🌍 Pali"],
+["rm","🇨🇭 Romanche"],
+["rn","🇧🇮 Rundi"],
+["sg","🇨🇫 Sango"],
+["sc","🇮🇹 Sardo"],
+["se","🇳🇴 Sami"],
+["ss","🇸🇿 Swati"],
+["ty","🇵🇫 Taitiano"],
+["bo","🇨🇳 Tibetano"],
+["ve","🇿🇦 Venda"],
+["vo","🌍 Volapük"],
+["wa","🇧🇪 Valão"],
+["wo","🇸🇳 Wolof"],
+["za","🇨🇳 Zhuang"]
+];
+
+// ===== ORDENAR =====
+const ordenados = [...idiomas].sort((a,b)=>{
+  const A = a[1].replace(/^[^\p{L}]+/u,"");
+  const B = b[1].replace(/^[^\p{L}]+/u,"");
+  return A.localeCompare(B,"pt-BR",{sensitivity:"base"});
+});
+
+// ===== FAVORITOS NO TOPO =====
+const finalLista = [
+  ...ordenados.filter(i=>favoritos.includes(i[0])),
+  ...ordenados.filter(i=>!favoritos.includes(i[0]))
+];
+
+// ===== PREENCHER =====
+finalLista.forEach(([c,n],i)=>{
+  fromLang.innerHTML+=`<option value="${c}">${n}</option>`;
+  toLang.innerHTML+=`<option value="${c}">${n}</option>`;
+  langA.innerHTML+=`<option value="${i}">${n}</option>`;
+  langB.innerHTML+=`<option value="${i}">${n}</option>`;
+});
+
+// ===== PADRÃO =====
+fromLang.value="pt";
+toLang.value="en";
+langA.value = finalLista.findIndex(i=>i[0]==="pt");
+langB.value = finalLista.findIndex(i=>i[0]==="en");
+
+
+// ===== TRADUÇÃO VIA IA (HUGGING FACE) =====
+async function traduzir(){
+
+  const texto = inputText.value.trim();
+  if(!texto) return;
+
+  outputText.value = "Traduzindo...";
+
+  // Mapeia idioma → modelo (exemplo PT → EN)
+  const modelo = `Helsinki-NLP/opus-mt-${fromLang.value}-${toLang.value}`;
+
+  try{
+    const r = await fetch(
+      `https://api-inference.huggingface.co/models/${modelo}`,
+      {
+        method:"POST",
+        headers:{
+          "Authorization": `Bearer ${HF_KEY}`,
+          "Content-Type":"application/json"
+        },
+        body: JSON.stringify({
+          inputs: texto
+        })
+      }
+    );
+
+    const data = await r.json();
+
+    if(data[0]?.translation_text){
+      outputText.value = data[0].translation_text;
+    } else {
+      outputText.value = "Modelo não disponível para esse idioma.";
+    }
+
+  }catch(e){
+    console.error(e);
+    outputText.value = "Erro na tradução.";
+  }
+}
+
+// ===== MICROFONE =====
+function falar(){
+  limparEntrada();
+
+  btnFalar.classList.add("pulsando","btn-ativo");
+
+  const rec=new (webkitSpeechRecognition||SpeechRecognition)();
+  rec.lang=fromLang.value;
+  rec.start();
+
+  rec.onresult=e=>{
+    inputText.value=e.results[0][0].transcript;
+  };
+
+  rec.onend=()=>{
+    btnFalar.classList.remove("pulsando","btn-ativo");
+  };
+}
+
+// ===== VOZ =====
+function ouvir(){
+  btnOuvir.classList.add("pulsando","btn-ativo");
+
+  const s=new SpeechSynthesisUtterance(outputText.value);
+  s.lang=toLang.value;
+  speechSynthesis.speak(s);
+
+  s.onend=()=>{
+    btnOuvir.classList.remove("pulsando","btn-ativo");
+  };
+}
+
+// ===== CÂMERA + OCR + SCANNER =====
+async function abrirCamera(){
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: "environment" } }
+  });
+
+  video.srcObject = stream;
+  video.style.display = "block";
+
+  video.onclick = async () => {
+
+    // 1️⃣ captura imagem
+    const ctx = canvas.getContext("2d");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+
+    // 2️⃣ modo scanner (OpenCV) → recorte e limpeza
+    processarScanner(canvas);
+
+    // 3️⃣ para câmera
+    stream.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+    video.style.display = "none";
+
+    // 4️⃣ OCR no resultado já tratado
+    const r = await Tesseract.recognize(canvas, "por");
+    inputText.value = r.data.text;
+
+    // 5️⃣ limpa canvas depois de usar
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 6️⃣ traduz
+    await traduzir();
+  };
+}
+
+
+
+
+function processarScanner(canvas){
+
+  let src = cv.imread(canvas);
+  let gray = new cv.Mat();
+  let blur = new cv.Mat();
+  let edges = new cv.Mat();
+
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
+  cv.Canny(blur, edges, 75, 200);
+
+  let contours = new cv.MatVector();
+  let hierarchy = new cv.Mat();
+  cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+  let maior = null;
+  let maxArea = 0;
+
+  for(let i=0;i<contours.size();i++){
+    let cnt = contours.get(i);
+    let area = cv.contourArea(cnt);
+    if(area > maxArea){
+      maxArea = area;
+      maior = cnt;
+    }
+  }
+
+  if(maior){
+    let rect = cv.boundingRect(maior);
+    let recorte = src.roi(rect);
+    cv.imshow(canvas, recorte);
+    recorte.delete();
+  }
+
+  src.delete(); gray.delete(); blur.delete(); edges.delete();
+  contours.delete(); hierarchy.delete();
+}
+
+
+
+
+// ===== CONVERSA =====
+let ouvindo=false;
+
+function falarPessoa(p){
+  if(ouvindo) return;
+  ouvindo=true;
+
+  const btn = (p==="A"?btnA:btnB);
+  btn.classList.add("pulsando","btn-ativo");
+
+  const origem = finalLista[p==="A"?langA.value:langB.value];
+  const destino = finalLista[p==="A"?langB.value:langA.value];
+
+  const rec=new (webkitSpeechRecognition||SpeechRecognition)();
+  rec.lang=origem[0];
+  rec.start();
+
+  rec.onresult=async e=>{
+    const txt=e.results[0][0].transcript;
+
+    log.value+=`\n${p}: ${txt}`;
+
+    const r=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=${origem[0]}|${destino[0]}`);
+    const d=await r.json();
+
+    log.value+=`\n➡️ ${d.responseData.translatedText}\n`;
+
+    const s=new SpeechSynthesisUtterance(d.responseData.translatedText);
+    s.lang=destino[0];
+    speechSynthesis.speak(s);
+
+    btn.classList.remove("pulsando","btn-ativo");
+    ouvindo=false;
+  };
+
+  rec.onerror=()=>{
+    btn.classList.remove("pulsando","btn-ativo");
+    ouvindo=false;
+  };
+}
+
+
+
+</script>
+
+</body>
+</html>
