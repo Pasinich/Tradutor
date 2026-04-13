@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tradutor PRO+</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  margin: 0;
+  color: #fff;
+}
+.container {
+  max-width: 500px;
+  margin: auto;
+  padding: 20px;
+}
+h1 { text-align: center; }
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.ativa {
+  background: #00ffcc;
+  color: #000;
+}
+
+.card {
+  background: rgba(255,255,255,0.1);
+  padding: 15px;
+  border-radius: 15px;
+}
+
+select, textarea, button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+textarea {
+  height: 100px;
+}
+
+.pulsando {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  50% { transform: scale(1.1); }
+}
+
+.btn-ativo {
+  background: #00ffcc !important;
+  color: #000;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🌍 Tradutor PRO+</h1>
+
+<div class="tabs">
+  <button class="tab-btn ativa" onclick="trocarAba('tradutor', this)">🌍 Tradução</button>
+  <button class="tab-btn" onclick="trocarAba('conversa', this)">🎙️ Conversa</button>
+</div>
+
+<!-- TRADUTOR -->
+<div id="tradutor" class="card">
+
+<select id="fromLang"></select>
+<select id="toLang"></select>
+
+<button onclick="inverter()">🔁 Inverter</button>
+
+<textarea id="inputText" placeholder="Digite ou fale..." onclick="limparEntrada()"></textarea>
+
+<div class="row">
+  <button onclick="traduzir()">🌐 Traduzir</button>
+  <button id="btnFalar" onclick="falar()">🎤</button>
+</div>
+
+<textarea id="outputText" readonly></textarea>
+
+<button id="btnOuvir" onclick="ouvir()">🔊 Ouvir</button>
+
+</div>
+
+<!-- CONVERSA -->
+<div id="conversa" class="card" style="display:none;">
+
+<select id="langA"></select>
+<select id="langB"></select>
+
+<div class="row">
+  <button id="btnA" onclick="falarPessoa('A')">🎤 Pessoa A</button>
+  <button id="btnB" onclick="falarPessoa('B')">🎤 Pessoa B</button>
+</div>
+
+<textarea id="log" placeholder="Conversa..."></textarea>
+
+</div>
+
+</div>
+
+<script>
+
+// ===== ABAS =====
+function trocarAba(id, el){
+  tradutor.style.display="none";
+  conversa.style.display="none";
+  document.getElementById(id).style.display="block";
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("ativa"));
+  el.classList.add("ativa");
+}
+
+// ===== LIMPAR CAMPOS =====
+function limparEntrada(){
+  inputText.value = "";
+  outputText.value = "";
+}
+
+// ===== FAVORITOS =====
+const favoritos = ["pt","en","es"];
+
+// ===== IDIOMAS =====
+const idiomas = [
+["af","🇿🇦 Africâner"],["sq","🇦🇱 Albanês"],["am","🇪🇹 Amárico"],["ar","🇸🇦 Árabe"],
+["hy","🇦🇲 Armênio"],["az","🇦🇿 Azerbaijano"],["bn","🇧🇩 Bengali"],
+["bg","🇧🇬 Búlgaro"],["ca","🇪🇸 Catalão"],["zh","🇨🇳 Chinês"],
+["ko","🇰🇷 Coreano"],["hr","🇭🇷 Croata"],["da","🇩🇰 Dinamarquês"],
+["sk","🇸🇰 Eslovaco"],["sl","🇸🇮 Esloveno"],["es","🇪🇸 Espanhol"],
+["et","🇪🇪 Estoniano"],["fi","🇫🇮 Finlandês"],["fr","🇫🇷 Francês"],
+["de","🇩🇪 Alemão"],["el","🇬🇷 Grego"],["he","🇮🇱 Hebraico"],
+["hi","🇮🇳 Hindi"],["hu","🇭🇺 Húngaro"],["is","🇮🇸 Islandês"],
+["id","🇮🇩 Indonésio"],["en","🇺🇸 Inglês"],["it","🇮🇹 Italiano"],
+["ja","🇯🇵 Japonês"],["kk","🇰🇿 Cazaque"],["km","🇰🇭 Khmer"],
+["lv","🇱🇻 Letão"],["lt","🇱🇹 Lituano"],["ms","🇲🇾 Malaio"],
+["mt","🇲🇹 Maltês"],["mr","🇮🇳 Marata"],["mn","🇲🇳 Mongol"],
+["ne","🇳🇵 Nepalês"],["nl","🇳🇱 Holandês"],["no","🇳🇴 Norueguês"],
+["fa","🇮🇷 Persa"],["pl","🇵🇱 Polonês"],["pt","🇧🇷 Português"],
+["ro","🇷🇴 Romeno"],["ru","🇷🇺 Russo"],["sr","🇷🇸 Sérvio"],
+["sw","🇰🇪 Suaíli"],["sv","🇸🇪 Sueco"],
+["ta","🇮🇳 Tâmil"],["te","🇮🇳 Telugu"],["th","🇹🇭 Tailandês"],
+["cs","🇨🇿 Tcheco"],["tr","🇹🇷 Turco"],["uk","🇺🇦 Ucraniano"],
+["ur","🇵🇰 Urdu"],["vi","🇻🇳 Vietnamita"],["zu","🇿🇦 Zulu"]
+];
+
+// ===== ORDENAR =====
+const ordenados = [...idiomas].sort((a,b)=>{
+  const A = a[1].replace(/^[^\p{L}]+/u,"");
+  const B = b[1].replace(/^[^\p{L}]+/u,"");
+  return A.localeCompare(B,"pt-BR",{sensitivity:"base"});
+});
+
+// ===== FAVORITOS NO TOPO =====
+const finalLista = [
+  ...ordenados.filter(i=>favoritos.includes(i[0])),
+  ...ordenados.filter(i=>!favoritos.includes(i[0]))
+];
+
+// ===== PREENCHER =====
+finalLista.forEach(([c,n],i)=>{
+  fromLang.innerHTML+=`<option value="${c}">${n}</option>`;
+  toLang.innerHTML+=`<option value="${c}">${n}</option>`;
+  langA.innerHTML+=`<option value="${i}">${n}</option>`;
+  langB.innerHTML+=`<option value="${i}">${n}</option>`;
+});
+
+// ===== PADRÃO =====
+fromLang.value="pt";
+toLang.value="en";
+langA.value = finalLista.findIndex(i=>i[0]==="pt");
+langB.value = finalLista.findIndex(i=>i[0]==="en");
+
+// ===== TRADUÇÃO =====
+async function traduzir(){
+  const r=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(inputText.value)}&langpair=${fromLang.value}|${toLang.value}`);
+  const d=await r.json();
+  outputText.value=d.responseData.translatedText;
+}
+
+// ===== MICROFONE =====
+function falar(){
+  limparEntrada();
+
+  btnFalar.classList.add("pulsando","btn-ativo");
+
+  const rec=new (webkitSpeechRecognition||SpeechRecognition)();
+  rec.lang=fromLang.value;
+  rec.start();
+
+  rec.onresult=e=>{
+    inputText.value=e.results[0][0].transcript;
+  };
+
+  rec.onend=()=>{
+    btnFalar.classList.remove("pulsando","btn-ativo");
+  };
+}
+
+// ===== VOZ =====
+function ouvir(){
+  btnOuvir.classList.add("pulsando","btn-ativo");
+
+  const s=new SpeechSynthesisUtterance(outputText.value);
+  s.lang=toLang.value;
+  speechSynthesis.speak(s);
+
+  s.onend=()=>{
+    btnOuvir.classList.remove("pulsando","btn-ativo");
+  };
+}
+
+// ===== CONVERSA =====
+let ouvindo=false;
+
+function falarPessoa(p){
+  if(ouvindo) return;
+  ouvindo=true;
+
+  const btn = (p==="A"?btnA:btnB);
+  btn.classList.add("pulsando","btn-ativo");
+
+  const origem = finalLista[p==="A"?langA.value:langB.value];
+  const destino = finalLista[p==="A"?langB.value:langA.value];
+
+  const rec=new (webkitSpeechRecognition||SpeechRecognition)();
+  rec.lang=origem[0];
+  rec.start();
+
+  rec.onresult=async e=>{
+    const txt=e.results[0][0].transcript;
+
+    log.value+=`\n${p}: ${txt}`;
+
+    const r=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=${origem[0]}|${destino[0]}`);
+    const d=await r.json();
+
+    log.value+=`\n➡️ ${d.responseData.translatedText}\n`;
+
+    const s=new SpeechSynthesisUtterance(d.responseData.translatedText);
+    s.lang=destino[0];
+    speechSynthesis.speak(s);
+
+    btn.classList.remove("pulsando","btn-ativo");
+    ouvindo=false;
+  };
+
+  rec.onerror=()=>{
+    btn.classList.remove("pulsando","btn-ativo");
+    ouvindo=false;
+  };
+}
+
+</script>
+
+</body>
+</html>
