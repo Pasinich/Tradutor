@@ -372,44 +372,67 @@ langA.value = finalLista.findIndex(i=>i[0]==="pt");
 langB.value = finalLista.findIndex(i=>i[0]==="en");
 
 
-// ===== TRADUÇÃO VIA IA (HUGGING FACE) =====
+// ===== TRADUÇÃO =====
+
+
 async function traduzir(){
 
   const texto = inputText.value.trim();
-  if(!texto) return;
+  if(!texto){
+    outputText.value = "";
+    return;
+  }
 
   outputText.value = "Traduzindo...";
 
-  // Mapeia idioma → modelo (exemplo PT → EN)
-  const modelo = `Helsinki-NLP/opus-mt-${fromLang.value}-${toLang.value}`;
-
+  // ===== 1️⃣ TENTA API GRATUITA =====
   try{
-    const r = await fetch(
-      `https://api-inference.huggingface.co/models/${modelo}`,
-      {
-        method:"POST",
-        headers:{
-          "Authorization": `Bearer ${HF_KEY}`,
-          "Content-Type":"application/json"
-        },
-        body: JSON.stringify({
-          inputs: texto
-        })
-      }
-    );
+
+    const r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl="
+      + fromLang.value + "&tl=" + toLang.value + "&dt=t&q=" + encodeURIComponent(texto));
 
     const data = await r.json();
 
-    if(data[0]?.translation_text){
-      outputText.value = data[0].translation_text;
-    } else {
-      outputText.value = "Modelo não disponível para esse idioma.";
+    let traducao = "";
+    data[0].forEach(t => traducao += t[0]);
+
+    if(traducao){
+      outputText.value = traducao;
+      return;
     }
 
   }catch(e){
-    console.error(e);
-    outputText.value = "Erro na tradução.";
+    console.log("Google fallback falhou");
   }
+
+  // ===== 2️⃣ FALLBACK LIBRE =====
+  try{
+
+    const r = await fetch("https://libretranslate.de/translate",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        q: texto,
+        source: fromLang.value,
+        target: toLang.value,
+        format: "text"
+      })
+    });
+
+    const d = await r.json();
+
+    if(d.translatedText){
+      outputText.value = d.translatedText;
+      return;
+    }
+
+  }catch(e){
+    console.log("Libre falhou");
+  }
+
+  // ===== 3️⃣ FALLBACK OFFLINE (NUNCA QUEBRA) =====
+  outputText.value =
+    "⚠️ Sem conexão com tradução online.\n\n" + texto;
 }
 
 // ===== MICROFONE =====
@@ -524,14 +547,56 @@ function processarScanner(canvas){
 }
 
 
+async function traduzirTexto(txt, origem, destino){
 
+  // 🔥 Google grátis
+  try{
+    const r = await fetch(
+      "https://translate.googleapis.com/translate_a/single?client=gtx&sl="
+      + origem + "&tl=" + destino + "&dt=t&q=" + encodeURIComponent(txt)
+    );
+
+    const data = await r.json();
+
+    let traducao = "";
+    data[0].forEach(t => traducao += t[0]);
+
+    if(traducao) return traducao;
+
+  }catch(e){
+    console.log("Google falhou");
+  }
+
+  // 🔁 fallback Libre
+  try{
+    const r = await fetch("https://libretranslate.de/translate",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        q: txt,
+        source: origem,
+        target: destino,
+        format: "text"
+      })
+    });
+
+    const d = await r.json();
+    if(d.translatedText) return d.translatedText;
+
+  }catch(e){
+    console.log("Libre falhou");
+  }
+
+  // 🧱 fallback final
+  return "⚠️ Sem tradução: " + txt;
+}
 
 // ===== CONVERSA =====
 let ouvindo=false;
 
 function falarPessoa(p){
   if(ouvindo) return;
-  ouvindo=true;
+  ouvindo = true;
 
   const btn = (p==="A"?btnA:btnB);
   btn.classList.add("pulsando","btn-ativo");
@@ -539,34 +604,35 @@ function falarPessoa(p){
   const origem = finalLista[p==="A"?langA.value:langB.value];
   const destino = finalLista[p==="A"?langB.value:langA.value];
 
-  const rec=new (webkitSpeechRecognition||SpeechRecognition)();
-  rec.lang=origem[0];
+  const rec = new (webkitSpeechRecognition || SpeechRecognition)();
+  rec.lang = origem[0];
   rec.start();
 
-  rec.onresult=async e=>{
-    const txt=e.results[0][0].transcript;
+  rec.onresult = async e => {
 
-    log.value+=`\n${p}: ${txt}`;
+    const txt = e.results[0][0].transcript;
 
-    const r=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=${origem[0]}|${destino[0]}`);
-    const d=await r.json();
+    log.value += `\n${p}: ${txt}`;
 
-    log.value+=`\n➡️ ${d.responseData.translatedText}\n`;
+    // 🔥 NOVA TRADUÇÃO (SEM MYMEMORY)
+    const traducao = await traduzirTexto(txt, origem[0], destino[0]);
 
-    const s=new SpeechSynthesisUtterance(d.responseData.translatedText);
-    s.lang=destino[0];
+    log.value += `\n➡️ ${traducao}\n`;
+
+    // 🔊 voz automática
+    const s = new SpeechSynthesisUtterance(traducao);
+    s.lang = destino[0];
     speechSynthesis.speak(s);
 
     btn.classList.remove("pulsando","btn-ativo");
-    ouvindo=false;
+    ouvindo = false;
   };
 
-  rec.onerror=()=>{
+  rec.onerror = () => {
     btn.classList.remove("pulsando","btn-ativo");
-    ouvindo=false;
+    ouvindo = false;
   };
 }
-
 
 
 </script>
