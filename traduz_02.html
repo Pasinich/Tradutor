@@ -211,9 +211,16 @@ textarea {
 
 <button id="btnOuvir" onclick="ouvir()">🔊 Ouvir</button>
 
-<button onclick="abrirCamera()">📷 Fotografar documento p/traduzir</button>
+<div class="row">
+  <button onclick="abrirCamera()">📷 Câmera</button>
+  <button onclick="importarImagem()">🖼️ Galeria</button>
+</div>
+
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
+
+<input type="file" id="fileInput" accept="image/*" style="display:none">
+
 
 </div>
 
@@ -655,6 +662,52 @@ function processarScanner(canvas){
   contours.delete(); hierarchy.delete();
 }
 
+
+function importarImagem(){
+  fileInput.click();
+}
+
+fileInput.addEventListener("change", async function(){
+
+  const file = this.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e){
+
+    const img = new Image();
+    img.src = e.target.result;
+
+    img.onload = async function(){
+
+      // desenha no canvas
+      const ctx = canvas.getContext("2d");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // 🔍 processa tipo scanner (melhora OCR)
+      try{
+        processarScanner(canvas);
+      }catch(e){
+        console.log("Scanner ignorado");
+      }
+
+      // 🧠 OCR
+      const r = await Tesseract.recognize(canvas, "por");
+      inputText.value = r.data.text;
+
+      // limpa canvas
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+
+      // 🌐 traduz automático
+      await traduzir();
+    };
+  };
+
+  reader.readAsDataURL(file);
+});
 
 async function traduzirTexto(txt, origem, destino){
 
