@@ -82,6 +82,43 @@ textarea {
   background: #00ffcc !important;
   color: #000;
 }
+
+#chat {
+  min-height: 200px;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.msg {
+  padding: 10px 14px;
+  border-radius: 15px;
+  max-width: 80%;
+  word-wrap: break-word;
+  font-size: 15px;
+}
+
+.A {
+  align-self: flex-start;
+  background: #ffffff;
+  color: #000;
+}
+
+.B {
+  align-self: flex-end;
+  background: #00ffcc;
+  color: #000;
+}
+
+.traducao {
+  align-self: center;
+  background: rgba(255,255,255,0.2);
+  font-size: 13px;
+}
+
 </style>
 </head>
 
@@ -93,7 +130,7 @@ textarea {
 
 <div class="tabs">
   <button class="tab-btn ativa" onclick="trocarAba('tradutor', this)">🌍 Tradução</button>
-  <button class="tab-btn" onclick="trocarAba('conversa', this)">🎙️ Conversa</button>
+  <button class="tab-btn" onclick="trocarAba('conversa', this)">🎙️ Conversação</button>
 </div>
 
 <!-- TRADUTOR -->
@@ -137,8 +174,9 @@ textarea {
 <button onclick="iniciarInterprete()">🎧 Modo Intérprete</button>
 <button onclick="pararInterprete()">⛔ Parar</button>
 
-<textarea id="log" placeholder="Conversa..."></textarea>
+<div id="chat"></div>
 
+<button onclick="limparChat()">🧹 Limpar conversa</button>
 </div>
 
 </div>
@@ -183,7 +221,7 @@ function inverter(){
 
 
 // ===== FAVORITOS =====
-const favoritos = ["pt","en","es","fr","de"];
+const favoritos = ["pt","en","es","fr","de","it"];
 
 // ===== IDIOMAS =====
 const idiomas = [
@@ -605,14 +643,25 @@ async function traduzirTexto(txt, origem, destino){
   return "⚠️ Sem tradução: " + txt;
 }
 
+function addMsg(texto, tipo){
+  const div = document.createElement("div");
+  div.className = "msg " + tipo;
+  div.innerText = texto;
 
+  chat.appendChild(div);
+
+  // scroll automático
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function limparChat(){
+  chat.innerHTML = "";
+}
 
 // ===== CONVERSA =====
 let ouvindo=false;
 
 function falarPessoa(p){
-  if(ouvindo) return;
-  ouvindo = true;
 
   const btn = (p==="A"?btnA:btnB);
   btn.classList.add("pulsando","btn-ativo");
@@ -628,27 +677,21 @@ function falarPessoa(p){
 
     const txt = e.results[0][0].transcript;
 
-    log.value+=`\n${p}: ${txt}`;
-    autoExpandir(log);
+    addMsg(txt, p);
 
-    // 🔥 NOVA TRADUÇÃO (SEM MYMEMORY)
     const traducao = await traduzirTexto(txt, origem[0], destino[0]);
 
-    log.value+=`\n➡️ ${traducao}\n`;
-    autoExpandir(log);
+    addMsg(traducao, "traducao");
 
-    // 🔊 voz automática
     const s = new SpeechSynthesisUtterance(traducao);
     s.lang = destino[0];
     speechSynthesis.speak(s);
 
     btn.classList.remove("pulsando","btn-ativo");
-    ouvindo = false;
   };
 
   rec.onerror = () => {
     btn.classList.remove("pulsando","btn-ativo");
-    ouvindo = false;
   };
 }
 
@@ -682,11 +725,11 @@ async function ouvirContinuo(){
 
     const txt = e.results[0][0].transcript;
 
-    log.value += `\n${ultimaPessoa}: ${txt}`;
+    addMsg(txt, ultimaPessoa);
 
     const traducao = await traduzirTexto(txt, origem[0], destino[0]);
 
-    log.value += `\n➡️ ${traducao}\n`;
+    addMsg(traducao, "traducao");
 
     const s = new SpeechSynthesisUtterance(traducao);
     s.lang = destino[0];
