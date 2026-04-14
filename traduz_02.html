@@ -63,11 +63,7 @@ textarea {
 }
 
 #log {
-  min-height: 150px;
-  max-height: 60vh;
-  overflow-y: auto;
-  resize: none;
-  font-size: 16px;
+  background-color: #efeae2;
 }
 
 .pulsando {
@@ -83,40 +79,101 @@ textarea {
   color: #000;
 }
 
+/* 🔥 BOLHAS TIPO WHATSAPP */
+.msgA {
+  background: #dcf8c6;
+  color: #000;
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin: 5px;
+  max-width: 70%;
+  margin-left: auto;
+}
+
+.msgB {
+  background: #fff;
+  color: #000;
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin: 5px;
+  max-width: 70%;
+  margin-right: auto;
+}
+
 #chat {
-  min-height: 200px;
-  max-height: 60vh;
+  min-height: 250px;
+  max-height: 65vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
+  padding: 12px;
+
+  background: #e7f1fb; /* 🔥 azul suave equilibrado */
+  border-radius: 12px;
 }
 
+/* bolha base */
 .msg {
-  padding: 10px 14px;
-  border-radius: 15px;
-  max-width: 80%;
-  word-wrap: break-word;
+  position: relative;
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 75%;
   font-size: 15px;
+  line-height: 1.4;
 }
 
+/* Pessoa A (esquerda) */
 .A {
   align-self: flex-start;
   background: #ffffff;
-  color: #000;
+  color: #111; /* preto suave */
 }
 
+/* rabinho esquerda */
+.A::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 10px;
+  border: 6px solid transparent;
+  border-right-color: #ffffff;
+}
+
+/* Pessoa B (direita) */
 .B {
   align-self: flex-end;
-  background: #00ffcc;
-  color: #000;
+  background: #d9fdd3; /* 🔥 verde mais moderno */
+  color: #111;
 }
 
+/* rabinho direita */
+.B::before {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 10px;
+  border: 6px solid transparent;
+  border-left-color: #dcf8c6;
+}
+
+/* tradução (central) */
 .traducao {
   align-self: center;
-  background: rgba(255,255,255,0.2);
-  font-size: 13px;
+  background: rgba(0,0,0,0.05);
+  color: #333;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+/* horário */
+.hora {
+  display: block;
+  font-size: 10px;
+  opacity: 0.5;
+  margin-top: 3px;
+  text-align: right;
 }
 
 </style>
@@ -644,11 +701,23 @@ async function traduzirTexto(txt, origem, destino){
 }
 
 function addMsg(texto, tipo){
+
   const div = document.createElement("div");
   div.className = "msg " + tipo;
-  div.innerText = texto;
+
+  const hora = new Date().toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  div.innerHTML = `
+    ${texto}
+    <span class="hora">${hora}</span>
+  `;
 
   chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+
 
   // scroll automático
   chat.scrollTop = chat.scrollHeight;
