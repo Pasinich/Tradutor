@@ -294,9 +294,33 @@ function trocarAba(id, el){
 
 // ===== LIMPAR CAMPOS =====
 function limparEntrada(){
- fecharCamera(); 
+fecharCamera(); 
+  // limpa texto
   inputText.value = "";
   outputText.value = "";
+
+  // 🔥 limpa imagem importada (Lens)
+  const img = document.getElementById("imgPreview");
+  const lensArea = document.getElementById("lensArea");
+
+  if(img) img.src = "";
+  if(lensArea) lensArea.style.display = "none";
+
+  // 🔥 esconde botão Traduzir Tudo
+  const btn = document.getElementById("btnTraduzirTudo");
+  if(btn) btn.style.display = "none";
+
+  // 🔥 limpa canvas (evita lixo visual)
+  const ctx = canvas.getContext("2d");
+  if(ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 🔥 reseta seleção Lens (se existir)
+  const box = document.getElementById("selecao");
+  if(box){
+    box.style.width = "0px";
+    box.style.height = "0px";
+    box.style.display = "none";
+  }
 }
 
 // ===== INVERTER IDIOMAS =====
@@ -582,7 +606,7 @@ fecharCamera();
 // ===== MICROFONE =====
 function falar(){
 fecharCamera(); 
-  limparEntrada();
+limparEntrada();
 
   btnFalar.classList.add("pulsando","btn-ativo");
 
@@ -717,9 +741,6 @@ function ativarSelecao(){
     }
   }
 
-
-
-
   function start(e){
     isSelecting = true;
 
@@ -797,7 +818,6 @@ async function recortarETraduzir(){
   );
 
   const r = await Tesseract.recognize(canvas, "por");
-
   inputText.value = r.data.text;
 
   await traduzir();
@@ -983,6 +1003,7 @@ fileInput.addEventListener("change", function(){
   // 🔥 limpa textos antigos
   inputText.value = "";
   outputText.value = "";
+  
 
   // 🔥 ativa seleção estilo Google Lens
   ativarSelecao();
@@ -1079,6 +1100,24 @@ const r = await Tesseract.recognize(canvasTemp, idiomaOCR, {
     console.error(e);
     inputText.value = "❌ Erro ao processar imagem";
   }
+}
+
+function limparImagemImportada(){
+
+  // limpa preview da imagem
+  const img = document.getElementById("imgPreview");
+  const lensArea = document.getElementById("lensArea");
+
+  img.src = "";
+  lensArea.style.display = "none";
+
+  // esconde botão "Traduzir Tudo"
+  const btn = document.getElementById("btnTraduzirTudo");
+  if(btn) btn.style.display = "none";
+
+  // limpa canvas se existir uso anterior
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 </script>
