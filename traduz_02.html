@@ -176,6 +176,18 @@ textarea {
   text-align: right;
 }
 
+#lensArea {
+  margin-top: 10px;
+}
+
+#selecao {
+  pointer-events: none;
+}
+
+#imgPreview {
+  touch-action: none;
+}
+
 </style>
 </head>
 
@@ -216,6 +228,16 @@ textarea {
   <button onclick="importarImagem()">🖼️ Galeria</button>
 </div>
 
+<div id="lensArea" style="position:relative; display:none;">
+  <img id="imgPreview" style="width:100%; border-radius:10px;">
+  <div id="selecao" style="
+    position:absolute;
+    border:2px dashed #00ffcc;
+    display:none;
+  "></div>
+</div>
+
+
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 
@@ -242,6 +264,10 @@ textarea {
 
 <button onclick="limparChat()">🧹 Limpar conversa</button>
 </div>
+<button id="btnTraduzirTudo" style="display:none;" onclick="TraduzirTudo()">
+  🌐 Traduzir Tudo
+</button>
+
 
 </div>
 
@@ -250,6 +276,7 @@ textarea {
 
 <script>
 
+let cameraStream = null;
 
 function autoExpandir(el){
   el.style.height = "auto";
@@ -267,6 +294,7 @@ function trocarAba(id, el){
 
 // ===== LIMPAR CAMPOS =====
 function limparEntrada(){
+ fecharCamera(); 
   inputText.value = "";
   outputText.value = "";
 }
@@ -492,7 +520,7 @@ langB.value = finalLista.findIndex(i=>i[0]==="en");
 
 
 async function traduzir(){
-
+fecharCamera(); 
   const texto = inputText.value.trim();
   if(!texto){
     outputText.value = "";
@@ -553,6 +581,7 @@ async function traduzir(){
 
 // ===== MICROFONE =====
 function falar(){
+fecharCamera(); 
   limparEntrada();
 
   btnFalar.classList.add("pulsando","btn-ativo");
@@ -583,46 +612,39 @@ function ouvir(){
   };
 }
 
-// ===== CÂMERA + OCR + SCANNER =====
+// ===== CÂMERA (PADRÃO LENS + LIMPEZA) =====
 async function abrirCamera(){
 
-  const stream = await navigator.mediaDevices.getUserMedia({
+  limparLens();
+
+  cameraStream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: { ideal: "environment" } }
   });
 
-  video.srcObject = stream;
+  video.srcObject = cameraStream;
   video.style.display = "block";
 
-  video.onclick = async () => {
+  video.onclick = () => {
 
-    // 1️⃣ captura imagem
     const ctx = canvas.getContext("2d");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
 
-    // 2️⃣ modo scanner (OpenCV) → recorte e limpeza
-    processarScanner(canvas);
+    fecharCamera(); // 🔥 fecha corretamente
 
-    // 3️⃣ para câmera
-    stream.getTracks().forEach(t => t.stop());
-    video.srcObject = null;
-    video.style.display = "none";
+    const img = document.getElementById("imgPreview");
+    const lensArea = document.getElementById("lensArea");
 
-    // 4️⃣ OCR no resultado já tratado
-    const r = await Tesseract.recognize(canvas, "por");
-    inputText.value = r.data.text;
+    img.src = canvas.toDataURL("image/png");
+    lensArea.style.display = "block";
 
-    // 5️⃣ limpa canvas depois de usar
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    inputText.value = "";
+    outputText.value = "";
 
-    // 6️⃣ traduz
-    await traduzir();
+    ativarSelecao();
   };
 }
-
-
-
 
 function processarScanner(canvas){
 
@@ -662,52 +684,126 @@ function processarScanner(canvas){
   contours.delete(); hierarchy.delete();
 }
 
-
 function importarImagem(){
-  fileInput.click();
+
+  fecharCamera(); // 🔥 fecha a câmera se estiver aberta
+
+  limparLens(); // 🔥 limpa tudo
+
+  document.getElementById("fileInput").click();
 }
 
-fileInput.addEventListener("change", async function(){
 
-  const file = this.files[0];
-  if(!file) return;
+function ativarSelecao(){
 
-  const reader = new FileReader();
+  const img = document.getElementById("imgPreview");
+  const box = document.getElementById("selecao");
 
-  reader.onload = async function(e){
+  let startX, startY, isSelecting = false;
 
-    const img = new Image();
-    img.src = e.target.result;
+  function getPos(e){
+    const rect = img.getBoundingClientRect();
 
-    img.onload = async function(){
+    if(e.touches){
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top
+      };
+    } else {
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+  }
 
-      // desenha no canvas
-      const ctx = canvas.getContext("2d");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
 
-      // 🔍 processa tipo scanner (melhora OCR)
-      try{
-        processarScanner(canvas);
-      }catch(e){
-        console.log("Scanner ignorado");
-      }
 
-      // 🧠 OCR
-      const r = await Tesseract.recognize(canvas, "por");
-      inputText.value = r.data.text;
 
-      // limpa canvas
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+  function start(e){
+    isSelecting = true;
 
-      // 🌐 traduz automático
-      await traduzir();
-    };
-  };
+    const pos = getPos(e);
 
-  reader.readAsDataURL(file);
-});
+    startX = pos.x;
+    startY = pos.y;
+
+    box.style.left = startX + "px";
+    box.style.top = startY + "px";
+    box.style.width = "0px";
+    box.style.height = "0px";
+    box.style.display = "block";
+  }
+
+  function move(e){
+    if(!isSelecting) return;
+
+    const pos = getPos(e);
+
+    box.style.width = (pos.x - startX) + "px";
+    box.style.height = (pos.y - startY) + "px";
+  }
+
+  function end(){
+    if(!isSelecting) return;
+
+    isSelecting = false;
+    recortarETraduzir();
+  }
+
+  // mouse
+  img.onmousedown = start;
+  img.onmousemove = move;
+  img.onmouseup = end;
+
+  // 🔥 TOUCH (CELULAR)
+  img.ontouchstart = start;
+  img.ontouchmove = move;
+  img.ontouchend = end;
+}
+
+async function recortarETraduzir(){
+
+  const img = document.getElementById("imgPreview");
+  const box = document.getElementById("selecao");
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  const imgRect = img.getBoundingClientRect();
+
+  const x = parseInt(box.style.left);
+  const y = parseInt(box.style.top);
+  const w = parseInt(box.style.width);
+  const h = parseInt(box.style.height);
+
+  // escala real da imagem
+  const scaleX = img.naturalWidth / imgRect.width;
+  const scaleY = img.naturalHeight / imgRect.height;
+
+  canvas.width = w * scaleX;
+  canvas.height = h * scaleY;
+
+  ctx.drawImage(
+    img,
+    x * scaleX,
+    y * scaleY,
+    w * scaleX,
+    h * scaleY,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  const r = await Tesseract.recognize(canvas, "por");
+
+  inputText.value = r.data.text;
+
+  await traduzir();
+}
+
+
 
 async function traduzirTexto(txt, origem, destino){
 
@@ -869,6 +965,121 @@ async function ouvirContinuo(){
   };
 }
 
+fileInput.addEventListener("change", function(){
+
+  const file = this.files[0];
+  if(!file) return;
+
+  const img = document.getElementById("imgPreview");
+  const lensArea = document.getElementById("lensArea");
+
+  // 🔥 mostra imagem na tela
+  img.src = URL.createObjectURL(file);
+  lensArea.style.display = "block";
+
+  // 🔥 mostra botão Traduzir Tudo
+  document.getElementById("btnTraduzirTudo").style.display = "block";
+
+  // 🔥 limpa textos antigos
+  inputText.value = "";
+  outputText.value = "";
+
+  // 🔥 ativa seleção estilo Google Lens
+  ativarSelecao();
+});
+
+function limparLens(){
+document.getElementById("btnTraduzirTudo").style.display = "none";
+  // limpa preview da imagem
+  const img = document.getElementById("imgPreview");
+  img.src = "";
+
+  // esconde área lens
+  document.getElementById("lensArea").style.display = "none";
+
+  // limpa seleção
+  const box = document.getElementById("selecao");
+  box.style.display = "none";
+  box.style.width = "0px";
+  box.style.height = "0px";
+
+  // limpa canvas
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // limpa input file (ESSENCIAL)
+  document.getElementById("fileInput").value = "";
+
+  // limpa textos
+  inputText.value = "";
+  outputText.value = "";
+}
+
+
+function fecharCamera(){
+  if(cameraStream){
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+
+  video.srcObject = null;
+  video.style.display = "none";
+}
+
+async function TraduzirTudo(){
+
+  const img = document.getElementById("imgPreview");
+
+  if(!img.src){
+    alert("Nenhuma imagem carregada");
+    return;
+  }
+
+  // 🔥 cria canvas real da imagem
+  const canvasTemp = document.createElement("canvas");
+  const ctx = canvasTemp.getContext("2d");
+
+  // 🔥 garante que a imagem carregou
+  if(!img.complete){
+    await new Promise(resolve => img.onload = resolve);
+  }
+
+  canvasTemp.width = img.naturalWidth;
+  canvasTemp.height = img.naturalHeight;
+
+  ctx.drawImage(img, 0, 0);
+
+  inputText.value = "🔍 Lendo imagem...";
+
+  try{
+
+    let idiomaOCR = "eng";
+
+if(fromLang.value === "pt") idiomaOCR = "por";
+if(fromLang.value === "es") idiomaOCR = "spa";
+if(fromLang.value === "fr") idiomaOCR = "fra";
+
+const r = await Tesseract.recognize(canvasTemp, idiomaOCR, {
+  logger: m => console.log(m)
+})
+.catch(() => Tesseract.recognize(canvasTemp, "eng"));
+
+    const texto = r.data.text.trim();
+
+    if(!texto){
+      inputText.value = "⚠️ Nenhum texto encontrado";
+      return;
+    }
+
+    inputText.value = texto;
+
+    await traduzir();
+
+  }catch(e){
+    console.error(e);
+    inputText.value = "❌ Erro ao processar imagem";
+  }
+}
 
 </script>
 
