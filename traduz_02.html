@@ -62,6 +62,14 @@ textarea {
   height: 100px;
 }
 
+#log {
+  min-height: 150px;
+  max-height: 60vh;
+  overflow-y: auto;
+  resize: none;
+  font-size: 16px;
+}
+
 .pulsando {
   animation: pulse 1s infinite;
 }
@@ -126,6 +134,9 @@ textarea {
   <button id="btnB" onclick="falarPessoa('B')">🎤 Pessoa B</button>
 </div>
 
+<button onclick="iniciarInterprete()">🎧 Modo Intérprete</button>
+<button onclick="pararInterprete()">⛔ Parar</button>
+
 <textarea id="log" placeholder="Conversa..."></textarea>
 
 </div>
@@ -138,7 +149,10 @@ textarea {
 <script>
 
 
-
+function autoExpandir(el){
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
 
 // ===== ABAS =====
 function trocarAba(id, el){
@@ -591,6 +605,8 @@ async function traduzirTexto(txt, origem, destino){
   return "⚠️ Sem tradução: " + txt;
 }
 
+
+
 // ===== CONVERSA =====
 let ouvindo=false;
 
@@ -612,12 +628,14 @@ function falarPessoa(p){
 
     const txt = e.results[0][0].transcript;
 
-    log.value += `\n${p}: ${txt}`;
+    log.value+=`\n${p}: ${txt}`;
+    autoExpandir(log);
 
     // 🔥 NOVA TRADUÇÃO (SEM MYMEMORY)
     const traducao = await traduzirTexto(txt, origem[0], destino[0]);
 
-    log.value += `\n➡️ ${traducao}\n`;
+    log.value+=`\n➡️ ${traducao}\n`;
+    autoExpandir(log);
 
     // 🔊 voz automática
     const s = new SpeechSynthesisUtterance(traducao);
@@ -631,6 +649,58 @@ function falarPessoa(p){
   rec.onerror = () => {
     btn.classList.remove("pulsando","btn-ativo");
     ouvindo = false;
+  };
+}
+
+// ===== MODO INTÉRPRETE AUTOMÁTICO =====
+let modoInterprete = false;
+let ultimaPessoa = "A";
+
+async function iniciarInterprete(){
+  modoInterprete = true;
+  ouvirContinuo();
+}
+
+function pararInterprete(){
+  modoInterprete = false;
+}
+
+async function ouvirContinuo(){
+
+  if(!modoInterprete) return;
+
+  const origem = finalLista[ultimaPessoa==="A"?langA.value:langB.value];
+  const destino = finalLista[ultimaPessoa==="A"?langB.value:langA.value];
+
+  const rec = new (webkitSpeechRecognition || SpeechRecognition)();
+  rec.lang = origem[0];
+  rec.interimResults = false;
+
+  rec.start();
+
+  rec.onresult = async (e)=>{
+
+    const txt = e.results[0][0].transcript;
+
+    log.value += `\n${ultimaPessoa}: ${txt}`;
+
+    const traducao = await traduzirTexto(txt, origem[0], destino[0]);
+
+    log.value += `\n➡️ ${traducao}\n`;
+
+    const s = new SpeechSynthesisUtterance(traducao);
+    s.lang = destino[0];
+
+    speechSynthesis.speak(s);
+
+    s.onend = ()=>{
+      ultimaPessoa = ultimaPessoa === "A" ? "B" : "A";
+      ouvirContinuo();
+    };
+  };
+
+  rec.onerror = ()=>{
+    setTimeout(ouvirContinuo, 1000);
   };
 }
 
