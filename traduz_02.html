@@ -235,7 +235,21 @@ textarea {
 
 <textarea id="outputText" readonly></textarea>
 
-<button id="btnOuvir" onclick="ouvir()">🔊 Ouvir</button>
+<div class="row">
+  <button id="btnOuvir" onclick="ouvir()">🔊 Ouvir</button>
+  <button id="btnPausar" onclick="pausarAudio()" style="display:none;">⏸️</button>
+  <button id="btnContinuar" onclick="continuarAudio()" style="display:none;">▶️</button>
+  <button id="btnPararAudio" onclick="pararAudio()" style="display:none;">⛔</button>
+</div>
+
+<!-- velocidade -->
+<select id="velocidadeAudio">
+  <option value="0.8">🐢 Lento</option>
+  <option value="1" selected>▶️ Normal</option>
+  <option value="1.3">⚡ Rápido</option>
+  <option value="1.6">🚀 Muito rápido</option>
+</select>
+
 
 <div class="row">
   <button onclick="abrirCamera()">📷 Câmera</button>
@@ -298,6 +312,16 @@ textarea {
 let cameraStream = null;
 let modoLensAtivo = false;
 let ultimaImagem = null;
+let ocrWorker = null;
+let ocrAtivo = false;
+let falaAtual = null;
+let pausado = false;
+let textoFalando = "";
+let posicaoAtual = 0;
+let partesTexto = [];
+let indiceAtual = 0;
+let falando = false;
+
 
 function autoExpandir(el){
   el.style.height = "auto";
@@ -391,7 +415,7 @@ const idiomas = [
 ["ay","🇧🇴 Aimará"],
 ["az","🇦🇿 Azerbaijano"],
 ["bm","🇲🇱 Bambara"],
-["eu","🇪🇸 Basco"],
+["eu","🇪?? Basco"],
 ["be","🇧🇾 Bielorrusso"],
 ["bn","🇧🇩 Bengali"],
 ["bho","🇮🇳 Bhojpuri"],
@@ -664,15 +688,16 @@ limparEntrada();
 
 // ===== VOZ =====
 function ouvir(){
-  btnOuvir.classList.add("pulsando","btn-ativo");
 
-  const s=new SpeechSynthesisUtterance(outputText.value);
-  s.lang=toLang.value;
-  speechSynthesis.speak(s);
+  speechSynthesis.cancel();
 
-  s.onend=()=>{
-    btnOuvir.classList.remove("pulsando","btn-ativo");
-  };
+  const texto = outputText.value;
+  if(!texto) return;
+
+  partesTexto = dividirTexto(texto);
+  indiceAtual = 0;
+
+  falarParte();
 }
 
 // ===== CÂMERA (PADRÃO LENS + LIMPEZA) =====
@@ -1176,6 +1201,166 @@ function restaurarImagem(){
   const btn = document.getElementById("btnTraduzirTudo");
   if(btn) btn.style.display = "block";
 }
+
+function pararAudio(){
+
+  // para a fala
+  speechSynthesis.cancel();
+
+  // 🔥 remove animação do botão ouvir
+  btnOuvir.classList.remove("pulsando","btn-ativo");
+
+  // esconde botão parar
+  document.getElementById("btnPararAudio").style.display = "none";
+}
+
+function pausarAudio(){
+
+  speechSynthesis.cancel();
+
+  falando = false;
+
+  // 🔥 garante que não pula frase
+  if(indiceAtual > 0) indiceAtual--;
+
+  btnPausar.style.display = "none";
+  btnContinuar.style.display = "block";
+
+  btnOuvir.classList.remove("pulsando");
+}
+
+function continuarAudio(){
+
+  if(!falando){
+    falarParte();
+  }
+}
+
+function pararAudio(){
+
+  speechSynthesis.cancel();
+
+  falando = false;
+  indiceAtual = 0;
+  partesTexto = [];
+
+  finalizarAudio();
+}
+
+function finalizarAudio(){
+
+  btnOuvir.classList.remove("pulsando","btn-ativo");
+
+  btnPararAudio.style.display = "none";
+  btnPausar.style.display = "none";
+  btnContinuar.style.display = "none";
+
+  falando = false;
+}
+
+
+function falarDoPonto(){
+
+  if(!textoFalando) return;
+
+  const textoRestante = textoFalando.substring(posicaoAtual);
+
+  falaAtual = new SpeechSynthesisUtterance(textoRestante);
+  falaAtual.lang = toLang.value;
+  falaAtual.rate = parseFloat(velocidadeAudio.value);
+
+  btnOuvir.classList.add("pulsando","btn-ativo");
+
+  speechSynthesis.speak(falaAtual);
+
+  btnPararAudio.style.display = "block";
+  btnPausar.style.display = "block";
+  btnContinuar.style.display = "none";
+
+  pausado = false;
+
+  // 🔥 atualiza posição enquanto fala
+  falaAtual.onboundary = (event)=>{
+    if(event.name === "word"){
+      posicaoAtual += event.charLength || 1;
+    }
+  };
+
+  falaAtual.onend = finalizarAudio;
+}
+
+function pausarAudio(){
+
+  if(speechSynthesis.speaking){
+
+    speechSynthesis.cancel(); // 🔥 para de verdade
+
+    pausado = true;
+
+    btnPausar.style.display = "none";
+    btnContinuar.style.display = "block";
+
+    btnOuvir.classList.remove("pulsando");
+  }
+}
+
+function continuarAudio(){
+
+  // 🔥 garante reset do motor de voz
+  speechSynthesis.cancel();
+
+  // 🔥 força voltar a falar do ponto atual
+  falarParte();
+}
+
+function pararAudio(){
+
+  speechSynthesis.cancel();
+
+  textoFalando = "";
+  posicaoAtual = 0;
+
+  finalizarAudio();
+}
+
+function dividirTexto(texto){
+  return texto.match(/[^\.!\?\n]+[\.!\?\n]*/g) || [texto];
+}
+
+function falarParte(){
+
+  speechSynthesis.cancel(); // 🔥 ESSENCIAL
+
+  if(indiceAtual >= partesTexto.length){
+    finalizarAudio();
+    return;
+  }
+
+  falando = true;
+
+  const parte = partesTexto[indiceAtual];
+
+  falaAtual = new SpeechSynthesisUtterance(parte);
+  falaAtual.lang = toLang.value;
+  falaAtual.rate = parseFloat(velocidadeAudio.value);
+
+  btnOuvir.classList.add("pulsando","btn-ativo");
+
+  speechSynthesis.speak(falaAtual);
+
+  btnPararAudio.style.display = "block";
+  btnPausar.style.display = "block";
+  btnContinuar.style.display = "none";
+
+  falaAtual.onend = ()=>{
+    if(falando){
+      indiceAtual++;
+      falarParte();
+    }
+  };
+}
+
+
 
 </script>
 
