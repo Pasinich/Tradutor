@@ -176,6 +176,24 @@ textarea {
   text-align: right;
 }
 
+.fala-ativa {
+  background: #fff3cd !important; /* amarelo suave */
+  box-shadow: 0 0 6px rgba(0,0,0,0.2);
+}
+
+.output-box {
+  width: 100%;
+  min-height: 100px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fff;
+  color: #000;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
 #lensArea {
   margin-top: 10px;
 }
@@ -233,7 +251,7 @@ textarea {
 </div>
 
 
-<textarea id="outputText" readonly></textarea>
+<div id="outputText" class="output-box" contenteditable="true"></div>
 
 <div class="row">
   <button id="btnOuvir" onclick="ouvir()">🔊 Ouvir</button>
@@ -250,6 +268,23 @@ textarea {
   <option value="1.6">🚀 Muito rápido</option>
 </select>
 
+
+<div id="barraContainer" style="
+  width:100%;
+  height:6px;
+  background:#ddd;
+  border-radius:10px;
+  margin-top:8px;
+  overflow:hidden;
+  display:none;
+">
+  <div id="barraProgresso" style="
+    height:100%;
+    width:0%;
+    background:#00c853;
+    transition:width 0.2s;
+  "></div>
+</div>
 
 <div class="row">
   <button onclick="abrirCamera()">📷 Câmera</button>
@@ -321,6 +356,8 @@ let posicaoAtual = 0;
 let partesTexto = [];
 let indiceAtual = 0;
 let falando = false;
+let totalPartes = 0;
+
 
 
 function autoExpandir(el){
@@ -345,10 +382,14 @@ function trocarAba(id, el){
 
 // ===== LIMPAR CAMPOS =====
 function limparEntrada(){
-fecharCamera(); 
-  // limpa texto
+
+  fecharCamera(); 
+
+  // limpa texto digitado
   inputText.value = "";
-  outputText.value = "";
+
+  // 🔥 limpa tradução (DIV)
+  outputText.innerHTML = "";
 
   // 🔥 limpa imagem importada (Lens)
   const img = document.getElementById("imgPreview");
@@ -361,11 +402,11 @@ fecharCamera();
   const btn = document.getElementById("btnTraduzirTudo");
   if(btn) btn.style.display = "none";
 
-  // 🔥 limpa canvas (evita lixo visual)
+  // 🔥 limpa canvas
   const ctx = canvas.getContext("2d");
   if(ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 🔥 reseta seleção Lens (se existir)
+  // 🔥 reseta seleção Lens
   const box = document.getElementById("selecao");
   if(box){
     box.style.width = "0px";
@@ -614,7 +655,7 @@ fecharCamera();
     return;
   }
 
-  outputText.value = "Traduzindo...";
+  outputText.innerText = "Traduzindo...";
 
   // ===== 1️⃣ TENTA API GRATUITA =====
   try{
@@ -628,7 +669,7 @@ fecharCamera();
     data[0].forEach(t => traducao += t[0]);
 
     if(traducao){
-      outputText.value = traducao;
+      outputText.innerText = traducao;
       return;
     }
 
@@ -691,11 +732,19 @@ function ouvir(){
 
   speechSynthesis.cancel();
 
-  const texto = outputText.value;
+  const texto = outputText.innerText;
   if(!texto) return;
 
   partesTexto = dividirTexto(texto);
   indiceAtual = 0;
+  totalPartes = partesTexto.length;
+
+mostrarTextoDestacado(); // ✅ AQUI SIM
+falarParte();
+
+  document.getElementById("barraContainer").style.display = "block";
+
+  mostrarTextoDestacado();
 
   falarParte();
 }
@@ -1255,6 +1304,9 @@ function finalizarAudio(){
   btnPausar.style.display = "none";
   btnContinuar.style.display = "none";
 
+  document.getElementById("barraProgresso").style.width = "0%";
+  document.getElementById("barraContainer").style.display = "none";
+
   falando = false;
 }
 
@@ -1329,12 +1381,18 @@ function dividirTexto(texto){
 
 function falarParte(){
 
-  speechSynthesis.cancel(); // 🔥 ESSENCIAL
+  speechSynthesis.cancel();
 
   if(indiceAtual >= partesTexto.length){
     finalizarAudio();
     return;
   }
+
+  mostrarTextoDestacado(); // 🔥 destaque atual
+
+  // 🔥 PROGRESSO
+  const progresso = ((indiceAtual + 1) / totalPartes) * 100;
+  document.getElementById("barraProgresso").style.width = progresso + "%";
 
   falando = true;
 
@@ -1360,7 +1418,20 @@ function falarParte(){
   };
 }
 
+function mostrarTextoDestacado(){
 
+  let html = "";
+
+  partesTexto.forEach((p, i)=>{
+    if(i === indiceAtual){
+      html += `<span class="fala-ativa">${p}</span>`;
+    }else{
+      html += `<span>${p}</span>`;
+    }
+  });
+
+  outputText.innerHTML = html;
+}
 
 </script>
 
