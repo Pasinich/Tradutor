@@ -188,6 +188,20 @@ textarea {
   touch-action: none;
 }
 
+#lensArea {
+  transition: all 0.25s ease;
+  animation: fadeIn 0.2s ease;
+}
+
+#selecao {
+  transition: all 0.1s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 </style>
 </head>
 
@@ -227,6 +241,11 @@ textarea {
   <button onclick="abrirCamera()">📷 Câmera</button>
   <button onclick="importarImagem()">🖼️ Galeria</button>
 </div>
+
+<button id="btnVoltarImagem" onclick="restaurarImagem()" style="display:none;">
+  ↩️ Voltar imagem
+</button>
+
 
 <div id="lensArea" style="position:relative; display:none;">
   <img id="imgPreview" style="width:100%; border-radius:10px;">
@@ -277,6 +296,8 @@ textarea {
 <script>
 
 let cameraStream = null;
+let modoLensAtivo = false;
+let ultimaImagem = null;
 
 function autoExpandir(el){
   el.style.height = "auto";
@@ -285,6 +306,12 @@ function autoExpandir(el){
 
 // ===== ABAS =====
 function trocarAba(id, el){
+
+// esconde botão "Traduzir Tudo"
+  const btn = document.getElementById("btnTraduzirTudo");
+  if(btn) btn.style.display = "none";
+
+
   tradutor.style.display="none";
   conversa.style.display="none";
   document.getElementById(id).style.display="block";
@@ -321,6 +348,18 @@ fecharCamera();
     box.style.height = "0px";
     box.style.display = "none";
   }
+}
+
+// ===== INVERTER IDIOMAS =====
+function inverter(){
+  const temp = fromLang.value;
+  fromLang.value = toLang.value;
+  toLang.value = temp;
+
+  // opcional: inverter textos também
+  const tempTxt = inputText.value;
+  inputText.value = outputText.value;
+  outputText.value = tempTxt;
 }
 
 // ===== INVERTER IDIOMAS =====
@@ -990,22 +1029,23 @@ fileInput.addEventListener("change", function(){
   const file = this.files[0];
   if(!file) return;
 
+  modoLensAtivo = true;
+
   const img = document.getElementById("imgPreview");
   const lensArea = document.getElementById("lensArea");
 
-  // 🔥 mostra imagem na tela
-  img.src = URL.createObjectURL(file);
+  const url = URL.createObjectURL(file);
+  img.src = url;
+
+  ultimaImagem = url;
+
   lensArea.style.display = "block";
 
-  // 🔥 mostra botão Traduzir Tudo
-  document.getElementById("btnTraduzirTudo").style.display = "block";
-
-  // 🔥 limpa textos antigos
-  inputText.value = "";
-  outputText.value = "";
-  
-
-  // 🔥 ativa seleção estilo Google Lens
+  // botão Traduzir Tudo aparece
+  const btn = document.getElementById("btnTraduzirTudo");
+  if(btn) btn.style.display = "block";
+// 🔥 MOSTRA BOTÃO VOLTAR IMAGEM
+  document.getElementById("btnVoltarImagem").style.display = "block";
   ativarSelecao();
 });
 
@@ -1118,6 +1158,23 @@ function limparImagemImportada(){
   // limpa canvas se existir uso anterior
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+
+function restaurarImagem(){
+
+  if(!ultimaImagem) return;
+
+  const img = document.getElementById("imgPreview");
+  const lensArea = document.getElementById("lensArea");
+
+  img.src = ultimaImagem;
+  lensArea.style.display = "block";
+
+  modoLensAtivo = true;
+
+  const btn = document.getElementById("btnTraduzirTudo");
+  if(btn) btn.style.display = "block";
 }
 
 </script>
