@@ -415,28 +415,14 @@ function limparEntrada(){
   }
 }
 
-// ===== INVERTER IDIOMAS =====
 function inverter(){
   const temp = fromLang.value;
   fromLang.value = toLang.value;
   toLang.value = temp;
 
-  // opcional: inverter textos também
   const tempTxt = inputText.value;
-  inputText.value = outputText.value;
-  outputText.value = tempTxt;
-}
-
-// ===== INVERTER IDIOMAS =====
-function inverter(){
-  const temp = fromLang.value;
-  fromLang.value = toLang.value;
-  toLang.value = temp;
-
-  // opcional: inverter textos também
-  const tempTxt = inputText.value;
-  inputText.value = outputText.value;
-  outputText.value = tempTxt;
+  inputText.value = outputText.innerText;
+  outputText.innerText = tempTxt;
 }
 
 
